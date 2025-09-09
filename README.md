@@ -5,7 +5,7 @@ This repository contains a Julia package for studying **Colored Gaussian graphic
 - 📄 **Linear Invariants of Gaussian DAG Models with Partial Homogeneity Constraints** by *Marina Garrote-López*, *Nataliia Kushnerchuk*, and *Liam Solus*.
 
 
-### 🔬 Core Features
+### 🛠️ Core Features
 
 This package offers a suite of utilities to:
 
