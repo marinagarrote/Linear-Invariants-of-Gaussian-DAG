@@ -40,7 +40,6 @@ After installation, you can check your version by running:
 julia --version
 ```
 
----
 
 ### 2. Install Oscar and other packages
 
@@ -64,7 +63,7 @@ To work with _Posets_ you need to install one more package:
 ```julia
 Pkg.add("Posets")
 ```
----
+
 
 ### 3. Recommended: Set Up VS Code for Julia Development 🧑‍💻
 
@@ -102,7 +101,6 @@ g = [[1,3],[2,3],[3,4],[2,5]]
 G = Oscar.graph_from_edges(Directed, g)
 ```
 
------
 
 ### Set Edge and Node Colors
 
@@ -115,7 +113,6 @@ edges_color = edge_constant_coloring(G)  # all edges same color
 nodes_color = node_constant_coloring(G)  # all nodes same color
 ```
 
----
 
 #### Alternative colorings
 
@@ -156,7 +153,7 @@ p = plot_colored_grap(G, edges_color, nodes_color, create_fixed_layout(G), "G")
 p
 ```
 
----
+
 
 ### Graph Properties
 
@@ -168,7 +165,7 @@ is_polytree(G)                   # true if G is a polytree (directed acyclic gra
 is_standard(G)                   # checks whether G is standard
 is_pi_graph_constant_coloring(G) # tests whether G with constant coloring is a π-graph
 ```
----
+
 
 ### Node and Graph Statistics
 
