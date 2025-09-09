@@ -172,7 +172,7 @@ function parameterization(M::GraphicalModel{Oscar.Graph{Directed}, GaussianRing}
     #W = error_covariance_matrix(M)
     Sigma = transpose(inv(Id-L))*W*inv(Id-L)
     
-    hom(S.ring, R, reduce(vcat, [[Sigma[i,j] for j in i:n_vertices(G)] for i in 1:n_vertices(G)]))
+    hom(S.ring, R, reduce(vcat, [[Sigma[i,j] for j in i:n_vertices(M.graph)] for i in 1:n_vertices(M.graph)]))
 end
 
 function parameterization(M::GraphicalModel{Oscar.Graph{Directed}, GaussianRing}, 

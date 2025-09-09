@@ -4,21 +4,35 @@ function generate_n_colors(n)
     return [HSV(i * 360.0 / n, 0.8, 0.9) for i in 0:(n - 1)]
 end
 
+function convert_to_Oscar(::Type{T}, G::DiGraph{Int64}) where {T <:Union{Directed, Undirected}}
+    edges = []
+    for e in Graphs.edges(G)
+        push!(edges, Oscar.Edge(e.src, e.dst))
+    end
+
+    return Oscar.graph_from_edges(T, Vector{Edge}(edges))
+end
+
+convert_to_Oscar(G::DiGraph{Int64}) = convert_to_Oscar(Directed, G)
+
+function covert_to_DiGraph(G::Oscar.Graph)
+     A =  matrix(ZZ, Oscar.adjacency_matrix(G))
+    return Graphs.DiGraph(Matrix{Int}(A))
+end
+
 function create_fixed_layout(G::Oscar.Graph)
-    A =  matrix(ZZ, Oscar.adjacency_matrix(G))
-    graph = Graphs.DiGraph(Matrix{Int}(A))
+    graph = covert_to_DiGraph(G)
     positions = spring_layout(graph; C=20)
     fixed_layout = (g) -> positions
     return fixed_layout
 end
 
-function plot_colored_grap(G, edges_color, nodes_color, 
+function plot_colored_graph(G::Oscar.Graph, edges_color, nodes_color, 
                            layout=layout=(args...)->spring_layout(args...; C=20), title="")
 
-    A =  matrix(ZZ, Oscar.adjacency_matrix(G))
-    G = Graphs.DiGraph(Matrix{Int}(A))
-    n = size(A,1)
-
+    n = Oscar.nv(G)
+    G = covert_to_DiGraph(G)
+    
     # Node labels
     # nodelabel = collect(values(nodes_color)) #[nodes_color[k] for k in 1:n]
     # nodelabel_unique = unique(nodelabel)
@@ -75,7 +89,7 @@ function hierarchical_layout(G::Oscar.Graph)
     layers = Dict(v => 0 for v in Oscar.vertices(G))
 
     for v in Oscar.vertices(G)
-        layers[v] = maximum(height(G,v))
+        layers[v] = maximum(distance_to_sinks(G, v))
     end
 
     # Group vertices by layer
@@ -111,7 +125,7 @@ function hierarchical_layout(G::Oscar.Graph)
             if n == 1
                 x_pos = 0.0
             end
-            positions[v] = (x_pos, l)
+            positions[v] = (x_pos, -l)
         end
     end
 
@@ -126,3 +140,5 @@ function hierarchical_layout(G::Oscar.Graph)
     fixed_layout = (g) -> pos_vector
     return fixed_layout
 end
+
+
