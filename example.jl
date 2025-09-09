@@ -1,6 +1,6 @@
-include("functions-GaussianModels.jl")
-include("functions-plots.jl")
-include("functions-posets.jl")
+include("src/functions-GaussianModels.jl")
+include("src/functions-plots.jl")
+include("src/functions-posets.jl")
 
 
 ## Define a graph from a vector of edges
