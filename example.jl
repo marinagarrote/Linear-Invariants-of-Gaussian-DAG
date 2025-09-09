@@ -12,7 +12,7 @@ edges_color = edge_constant_coloring(G) # Same color in all edges
 nodes_color = node_constant_coloring(G) # Same color in all nodes
 
 ## Plot the graph
-p = plot_colored_grap(G, edges_color, nodes_color, create_fixed_layout(G), "G"); p
+p = plot_colored_grap(G, edges_color, nodes_color, hierarchical_layout(G), "G"); p
 
 ######################################
 #

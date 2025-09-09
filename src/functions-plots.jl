@@ -4,7 +4,7 @@ function generate_n_colors(n)
     return [HSV(i * 360.0 / n, 0.8, 0.9) for i in 0:(n - 1)]
 end
 
-function create_fixed_layout(G)
+function create_fixed_layout(G::Oscar.Graph)
     A =  matrix(ZZ, Oscar.adjacency_matrix(G))
     graph = Graphs.DiGraph(Matrix{Int}(A))
     positions = spring_layout(graph; C=20)
@@ -54,4 +54,75 @@ function plot_colored_grap(G, edges_color, nodes_color,
     #edgelabelc=edgefillc,
     #edgelabel=edge_matrix[:,3],  edgelabeldistx=0.8, edgelabeldisty=0.8)
     return(p)
+end
+
+function hierarchical_layout(G::Oscar.Graph)
+
+    # Ensure DAG
+    if is_cyclic(G)
+        error("Graph must be a DAG for hierarchical layout.")
+    end
+
+    A =  matrix(ZZ, Oscar.adjacency_matrix(G))
+
+    # Find sources (no incoming edges) and sinks (no outgoing edges)
+    indegrees = sum(A[i,:] for i in 1:size(A)[1])
+    outdegree = sum(A[:,i] for i in 1:size(A)[1])
+    sources =  findall((indegrees .== 0) .& (outdegree .> 0))
+    sinks   = findall(outdegree .== 0)
+
+    # Compute longest distance from any source (layer assignment)
+    layers = Dict(v => 0 for v in Oscar.vertices(G))
+
+    for v in Oscar.vertices(G)
+        layers[v] = maximum(height(G,v))
+    end
+
+    # Group vertices by layer
+    layer_groups = Dict{Int, Vector{Int}}()
+    for (v, l) in layers
+        push!(get!(layer_groups, l, Int[]), v)
+    end
+
+    # # Assign coordinates
+    # positions = Dict{Int, Tuple{Float64, Float64}}()
+    # for (l, group) in sort(collect(layer_groups), by=x->x[1])
+    #     n = length(group)
+    #     for (i, v) in enumerate(group)
+    #         # Spread nodes horizontally, y = -layer for downward layout
+    #         positions[v] = (i - (n+1)/2, -l)
+    #     end
+    # end
+
+    #  # --- Return a callable layout function ---
+    # fixed_layout = (g) -> positions
+    # return fixed_layout
+
+
+     # Assign coordinates
+    positions = Dict{Int, Tuple{Float64, Float64}}()
+    max_width = maximum(length(g) for g in values(layer_groups))
+
+    for (l, group) in sort(collect(layer_groups), by=x->x[1])
+        n = length(group)
+        for (i, v) in enumerate(sort(group)) # Sort group for consistent ordering
+            # Spread nodes horizontally, y = -layer for downward layout
+            x_pos = (i - 1) * (max_width / (n > 1 ? n - 1 : 1)) - (max_width / 2)
+            if n == 1
+                x_pos = 0.0
+            end
+            positions[v] = (x_pos, l)
+        end
+    end
+
+    # --- This is the corrected part ---
+    # Convert the Dict of positions to a Vector ordered by vertex index
+    n_v = Oscar.nv(G)
+    pos_vector_x = [positions[i][1] for i in 1:n_v]
+    pos_vector_y = [positions[i][2] for i in 1:n_v]
+
+    # Return a callable layout function that provides the ordered vector
+    pos_vector = (pos_vector_x, pos_vector_y)
+    fixed_layout = (g) -> pos_vector
+    return fixed_layout
 end

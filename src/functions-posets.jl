@@ -196,7 +196,7 @@ function is_cyclic(g::Oscar.Graph{Directed})
     function dfs_visit(u::Int)
         visited_states[u] = 1 # Mark as "visiting" (gray)
 
-        for v in Oscar.out_neighbors(g, u)
+        for v in Oscar.outneighbors(g, u)
             if visited_states[v] == 1
                 # Found a back edge to a node in the current recursion stack. This means there is a cycle.
                 return true

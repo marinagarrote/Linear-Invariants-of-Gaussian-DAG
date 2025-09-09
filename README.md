@@ -145,7 +145,9 @@ It takes as input:
 - the graph `G`,
 - a coloring scheme for the edges,
 - a coloring scheme for the nodes,
-- a layout function (here `create_fixed_layout`), and
+- a **layout function**:
+  - `hierarchical_layout`: Arranges nodes hierarchically, placing sources at the top, sinks at the bottom, and all other nodes in ordered layers in between.
+  - `create_fixed_layout`: Generates a fixed, reproducible layout based on `spring_layout`, useful for comparing different graphs consistently.
 - a title for the plot.
 
 ```julia
