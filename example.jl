@@ -38,16 +38,41 @@ height(G)
 ## Given a vector representing a height: h = [h₁, …, hₙ] 
 h = [1,1]
 vertices_with_height(G, h)
-width_height(G, h) # wₕ(G)
+width(G, h, :height) # wₕ(G)
 
 ## Given a vector representing a content: c = [c₁, …, cₙ] 
 c = [2]
 vertices_with_content(G, c)
-width_content(G, c)
+width(G, c, :content)
 
 ## Given two vectors x = [x₁, …, xₙ], y = [y₁, …, yₘ]
 ## meet(x,y) return the minimum entrywise
 meet([1,2,5,4], [2,1]) 
+
+
+######################################
+#
+#   Posets and plots
+#
+######################################
+
+## TODO (missing): Poset of trek-polynomials 
+
+## Poset of heights
+Ph = poset(G, :height)
+
+#Any poset has two internal objects
+poset(Ph) # poset, where elemnets are integers 1:n
+p_labels(Ph) # Dictionary between poset elements and height/content vectors
+p_height = plot_poset(Ph, G, :height, "G"); 
+p_height
+
+## Poset of contents
+Pc = poset(G, :content)
+p_content = plot_poset(Pc, G, :content, "G"); 
+p_content
+
+P = vstack(p, hstack(p_height, p_content))
 
 
 #########################################
