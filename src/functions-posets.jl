@@ -67,9 +67,38 @@ function is_pi_graph(M::GraphicalModel{Oscar.Graph{Directed}, GaussianRing},
     return length(int[int .!= 0]) == 0
 end
 
+
+##########################################
+#
+#  Intersect vectors of heights or content
+#
+##########################################
+
+function meet(v1::Vector{T}, v2::Vector{T}) where {T}
+    L = max(length(v1), length(v2))
+    v1 = ifelse(length(v1) < L, vcat(v1, zeros(T, L-length(v1))), v1)
+    v2 = ifelse(length(v2) < L, vcat(v2, zeros(T, L-length(v2))), v2)
+
+    m = zeros(T, L)
+    for i in 1:L
+        m[i] = min(v1[i], v2[i])
+    end
+    return m
+end
+
+function isless(v1::Vector{T}, v2::Vector{T}) where {T}
+
+    L = max(length(v1), length(v2))
+    v1 = ifelse(length(v1) < L, vcat(v1, zeros(T, L-length(v1))), v1)
+    v2 = ifelse(length(v2) < L, vcat(v2, zeros(T, L-length(v2))), v2)
+
+    
+    all(v1 .<= v2)
+end
+
 ####################################
 #
-#  Build poset of trek-polynomials
+#  Structs Posets
 #
 ####################################
 
@@ -135,6 +164,13 @@ poset(P::labeledPoset) = P.poset
 p_labels(P::labeledPoset) = P.labels.fwd
 
 
+
+####################################
+#
+#  Trek-polynomial Posets
+#
+####################################
+
 function poset(M, p::Oscar.MPolyAnyMap)
     s = ring(M).gens
 
@@ -192,9 +228,147 @@ function poset(M, p::Oscar.MPolyAnyMap)
         end
     end
 
-    return(P, poset_labels)
+    return labeledPoset(P, poset_labels)
+end
 
+function plot_poset(P::labeledPoset{T, K, V}) where {T, K, V<: MPolyRingElem}
+    G = convert_to_Oscar(cover_digraph(P))
+    lay = hierarchical_layout(G)
+
+    n = Oscar.nv(G)
+    G = covert_to_DiGraph(G)
+    
+    # Node labels
+    n_node_colors = 2
+    
+    # Edge labels
+    edge_list = collect(Graphs.edges(G))  # Collect into a vector
+    edge_matrix = zeros(Int64, length(edge_list), 3)
+    for (i, edge) in enumerate(edge_list)
+        edge_matrix[i, 1] = edge.src
+        edge_matrix[i, 2] = edge.dst
+        edge_matrix[i, 3] = edges_color[Oscar.Edge(edge.src, edge.dst)]
+    end
+    edgelabel_unique = sort(unique(edge_matrix[:, 3]))
+
+    # Colors
+    n_colors = n_node_colors + maximum(edgelabel_unique)
+    # print(n_colors)
+    colors = generate_n_colors(2)
+
+    nodefillc = [nodes_color[i] for i in 1:n] #vcat([findall(x -> x ==i, nodelabel_unique) for i in nodelabel]...)
+    nodefillc = colors[nodefillc]
+
+    #edgefillc = vcat([findall(x -> x == i, edgelabel_unique) for i in edge_matrix[:, 3]]...)
+    #edgefillc = vcat([findall(x -> x == i, edgelabel_unique) for i in edge_matrix[:, 3]]...)
+    edgefillc = edge_matrix[:, 3]
+    edgefillc = colors[edgefillc .+ n_node_colors]
+
+    #layout=(args...)->spring_layout(args...; C=20) 
+    p = gplot(G, layout=lay, nodefillc=nodefillc, nodelabel=1:n, 
+    edgestrokec=edgefillc, EDGELINEWIDTH=0.7,
+    title=title, title_color="white", title_size=6)#, 
+    #edgelabelc=edgefillc,
+    #edgelabel=edge_matrix[:,3],  edgelabeldistx=0.8, edgelabeldisty=0.8)
+    return(p)
 end
 
 
+
+####################################
+#
+#  Height/Content Posets
+#
+####################################
+
+# Define an abstract type for all our plot styles
+abstract type PlotPosetStyle end
+
+# Define a concrete type for each symbol value
+struct HeightLayout <: PlotPosetStyle end
+struct ContentLayout <: PlotPosetStyle end
+
+
+function poset(G::Oscar.Graph, type::Symbol)
+    if type == :height
+        return _poset(G, HeightLayout())
+    elseif type == :content
+        return _poset(G, ContentLayout())
+    else
+        error("Unsupported poset type: ", type)
+    end
+end
+
+function _poset(G::Oscar.Graph, layout::HeightLayout)
+    V = Oscar.vertices(G)
+
+    h = []
+    
+    for v in V
+        push!(h, height(G,v))
+    end
+    h = unique(h)
+    sort!(h, by = v -> (length(v), v))
+
+    poset_labels = BiDict{Int, Vector{Int}}()
+
+    for k in 1:length(h)
+        setindex!(poset_labels, k, h[k])
+    end
+
+    P = Poset(length(h))
+
+    # Compare sij's vs sij's
+    for i in 1:length(h)
+        for j in (i+1):length(h)
+            h1 = h[i]
+            h2 = h[j]
+            if isless(h1, h2)
+                add_relation!(P, poset_labels[h1], poset_labels[h2])
+            elseif isless(h2,h1)
+                add_relation!(P, poset_labels[h2], poset_labels[h1])
+            end
+        end
+    end
+
+    return labeledPoset(P, poset_labels)
+
+end
+
+function _poset(G::Oscar.Graph, layout::ContentLayout)
+    
+   V = Oscar.vertices(G)
+
+    c = []
+    
+    for v in V
+        push!(c, content(G,v))
+    end
+    c = unique(c)
+    sort!(c, by = v -> (length(v), v))
+
+    poset_labels = BiDict{Int, Vector{Int}}()
+
+    for k in 1:length(c)
+        setindex!(poset_labels, k, c[k])
+    end
+
+    P = Poset(length(c))
+
+    for i in 1:length(c)
+        for j in (i+1):length(c)
+            c1 = c[i]
+            c2 = c[j]
+            if isless(c1, c2)
+                add_relation!(P, poset_labels[c1], poset_labels[c2])
+            elseif isless(c2,c1)
+                add_relation!(P, poset_labels[c2], poset_labels[c1])
+            end
+        end
+    end
+
+    return labeledPoset(P, poset_labels)
+
+
+end
 

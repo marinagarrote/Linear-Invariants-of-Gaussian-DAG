@@ -192,6 +192,8 @@ function create_random_polytree(n::Int)
         # Move the new vertex into the tree
         push!(vertices_in_tree, v)
         delete!(vertices_outside, v)
+        print(undirected_edges)
+
     end
 
     # --- 3. Create a Directed Graph and Add Edges ---
@@ -208,6 +210,173 @@ function create_random_polytree(n::Int)
     end
 
     return polytree
+end
+
+# - `n::Int`: The number of vertices in the graph.
+# - `elongation_factor::Float64`: A value between 0.0 and 1.0. Higher values produce
+#   longer, more path-like graphs. A value of 0.0 replicates the original "bushy"
+#   behavior, while 1.0 produces a simple path graph. Defaults to 0.8.
+# - `single_root::Bool`: If true, directs all edges away from a root (vertex 1)
+#   to preserve the tree's depth. If false, uses the original u < v rule. Defaults to true.
+
+function create_random_polytree(n::Int; elongation_factor::Float64=0.8, single_root::Bool=true)
+    # --- 1. Handle Base Cases & Validate Input ---
+    if n < 0
+        error("Number of vertices cannot be negative.")
+    elseif n <= 1
+        return Oscar.Graph{Directed}(n)
+    end
+
+    if !(0.0 <= elongation_factor <= 1.0)
+        error("elongation_factor must be between 0.0 and 1.0.")
+    end
+
+    # --- 2. Generate a Random Undirected Tree with Elongation Bias ---
+    undirected_edges = Tuple{Int, Int}[]
+    vertices_in_tree = Set{Int}([1])
+    vertices_outside = Set{Int}(2:n)
+    last_vertex_added = 1
+
+    while !isempty(vertices_outside)
+        u = -1
+        # With probability `elongation_factor`, connect to the last vertex to create a chain.
+        if rand() < elongation_factor
+            u = last_vertex_added
+        else
+            # Otherwise, connect to a random vertex in the tree to create a branch.
+            u = rand(vertices_in_tree)
+        end
+
+        # Pick a random vertex not yet in the tree
+        v = rand(vertices_outside)
+
+        push!(undirected_edges, (u, v))
+
+        # Move the new vertex into the tree and update the last one
+        push!(vertices_in_tree, v)
+        delete!(vertices_outside, v)
+        last_vertex_added = v
+    end
+
+    # --- 3. Create a Directed Graph and Add Edges ---
+    polytree = Oscar.Graph{Directed}(n)
+
+    if single_root
+        # Option A: BFS-based direction (preserves depth and creates an arborescence)
+        adj = [Int[] for _ in 1:n]
+        for (u, v) in undirected_edges
+            push!(adj[u], v)
+            push!(adj[v], u)
+        end
+
+        q = [1] # Use a Vector as a queue, starting with root 1
+        visited = falses(n)
+        visited[1] = true
+
+        while !isempty(q)
+            parent = popfirst!(q)
+            for child in adj[parent]
+                if !visited[child]
+                    visited[child] = true
+                    Oscar.add_edge!(polytree, parent, child) # Direct edge away from parent
+                    push!(q, child)
+                end
+            end
+        end
+    else
+        # Option B: Original index-based direction (simple & acyclic)
+        for (u, v) in undirected_edges
+            if u < v
+                Oscar.add_edge!(polytree, u, v)
+            else
+                Oscar.add_edge!(polytree, v, u)
+            end
+        end
+    end
+
+    return polytree
+end
+
+function custom_shuffle(coll)
+    arr = collect(coll)
+    n = length(arr)
+    for i in n:-1:2
+        j = rand(1:i)
+        arr[i], arr[j] = arr[j], arr[i]
+    end
+    return arr
+end
+
+
+function create_random_polytree(n::Int; backbone_fraction::Float64=0.8, edge_reversal_fraction::Float64=0.3)
+    # --- 1. Handle Base Cases & Validate Input ---
+    if n < 0
+        error("Number of vertices cannot be negative.")
+    elseif n <= 1
+        return Oscar.Graph{Directed}(n)
+    end
+    # (Input validation for fractions)
+    if !(0.0 <= backbone_fraction <= 1.0) || !(0.0 <= edge_reversal_fraction <= 1.0)
+        error("Fractions must be between 0.0 and 1.0.")
+    end
+
+    # --- 2. Build the Undirected Tree ---
+    undirected_edges = Tuple{Int, Int}[]
+    backbone_len = clamp(round(Int, n * backbone_fraction), n > 1 ? 2 : n, n)
+    shuffled_vertices = custom_shuffle(1:n)
+    backbone_nodes = shuffled_vertices[1:backbone_len]
+    remaining_nodes = shuffled_vertices[(backbone_len + 1):end]
+    
+    for i in 1:(backbone_len - 1)
+        push!(undirected_edges, (backbone_nodes[i], backbone_nodes[i+1]))
+    end
+
+    nodes_in_tree = Set(backbone_nodes)
+    for v in remaining_nodes
+        u = rand(collect(nodes_in_tree))
+        push!(undirected_edges, (u, v))
+        push!(nodes_in_tree, v)
+    end
+
+    # --- 3. Create a Single-Rooted Directed Tree (Arborescence) via BFS ---
+    arborescence = Oscar.Graph{Directed}(n)
+    adj = [Int[] for _ in 1:n]
+    for (u, v) in undirected_edges
+        push!(adj[u], v)
+        push!(adj[v], u)
+    end
+
+    root = backbone_nodes[1]
+    q = [root]
+    visited = falses(n)
+    visited[root] = true
+    while !isempty(q)
+        parent = popfirst!(q)
+        for child in adj[parent]
+            if !visited[child]
+                visited[child] = true
+                Oscar.add_edge!(arborescence, parent, child)
+                push!(q, child)
+            end
+        end
+    end
+    
+    # --- 4. Randomly Reverse Edges to Create a Multi-Rooted Polytree ---
+    # This step converts the arborescence into a more general polytree.
+    final_polytree = Oscar.Graph{Directed}(n)
+    for edge in Oscar.edges(arborescence)
+        u, v = Oscar.src(edge), Oscar.dst(edge)
+        
+        if rand() < edge_reversal_fraction
+            # Reverse the edge's direction
+            Oscar.add_edge!(final_polytree, v, u)
+        else
+            # Keep the original direction
+            Oscar.add_edge!(final_polytree, u, v)
+        end
+    end
+    
+    return final_polytree
 end
 
 ####################################
@@ -278,7 +447,7 @@ function height(G::Oscar.Graph, v::Int)
     sn = source_nodes(G)
    
     if v in sn
-        return 0
+        return [0]
     end
 
     h = []
@@ -288,7 +457,7 @@ function height(G::Oscar.Graph, v::Int)
 
     h = h[h .> 0]
 
-    return(sort(h))
+    return Vector{Int64}(sort(h))
 end
 
 function distance_to_sinks(G::Oscar.Graph, v::Int)
@@ -376,7 +545,7 @@ function vertices_with_content(G::Oscar.Graph, c::Vector{Int})
 
 end
 
-function width_height(G::Oscar.Graph, h::Vector{Int})
+function _width_height(G::Oscar.Graph, h::Vector{Int})
     vh = vertices_with_height(G, h)
 
     w = 0
@@ -387,7 +556,7 @@ function width_height(G::Oscar.Graph, h::Vector{Int})
     return w
 end
 
-function width_content(G::Oscar.Graph, c::Vector{Int})
+function _width_content(G::Oscar.Graph, c::Vector{Int})
     vh = vertices_with_content(G, c)
 
     w = 0
@@ -396,6 +565,16 @@ function width_content(G::Oscar.Graph, c::Vector{Int})
     end
 
     return w
+end
+
+function width(G::Oscar.Graph, v::Vector{Int}, type::Symbol)
+    if type == :height
+        return  _width_height(G, v)
+    elseif type == :content
+        return _width_content(G, v)
+    else
+        error("Unsupported vector type: ", type)
+    end
 end
 
 function width(G::Oscar.Graph)
@@ -408,23 +587,11 @@ function width(G::Oscar.Graph)
     return w
 end
 
-function meet(v1::Vector{T}, v2::Vector{T}) where {T}
-    L = max(length(v1), length(v2))
-    v1 = ifelse(length(v1) < L, vcat(v1, zeros(T, L-length(v1))), v1)
-    v2 = ifelse(length(v2) < L, vcat(v2, zeros(T, L-length(v2))), v2)
-
-    m = zeros(T, L)
-    for i in 1:L
-        m[i] = min(v1[i], v2[i])
-    end
-    return m
-end
-
 function content(G::Oscar.Graph, v::Int, c::Vector{Any} = [], dist::Int = 1)
     
     in_vert = Oscar.inneighbors(G, v)
     if length(in_vert) == 0
-        return c
+        return Vector{Int64}(ifelse(length(c) == 0, [0], c))
     end
 
     if length(c) >= dist
@@ -439,7 +606,7 @@ function content(G::Oscar.Graph, v::Int, c::Vector{Any} = [], dist::Int = 1)
     for i in in_vert
         content(G, i, c, dist)
     end
-    return c
+    return Vector{Int64}(c)
 end
 
 function content(G::Oscar.Graph)

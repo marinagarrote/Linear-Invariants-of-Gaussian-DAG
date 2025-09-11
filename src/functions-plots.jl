@@ -1,4 +1,5 @@
 using Graphs, Colors, GraphPlot
+using Gadfly
 
 function generate_n_colors(n)
     return [HSV(i * 360.0 / n, 0.8, 0.9) for i in 0:(n - 1)]
@@ -63,14 +64,17 @@ function plot_colored_graph(G::Oscar.Graph, edges_color, nodes_color,
 
     #layout=(args...)->spring_layout(args...; C=20) 
     p = gplot(G, layout=layout, nodefillc=nodefillc, nodelabel=1:n, 
-    edgestrokec=edgefillc, EDGELINEWIDTH=0.7,
-    title=title, title_color="white", title_size=6)#, 
+    edgestrokec=edgefillc, EDGELINEWIDTH=0.5,
+    title=title, title_color="white", title_size=6,
+    pad=1cm,
+    plot_size=(30cm, 15cm))
+    #, 
     #edgelabelc=edgefillc,
     #edgelabel=edge_matrix[:,3],  edgelabeldistx=0.8, edgelabeldisty=0.8)
     return(p)
 end
 
-function hierarchical_layout(G::Oscar.Graph)
+function hierarchical_layout(G::Oscar.Graph, poset::Bool = false)
 
     # Ensure DAG
     if is_cyclic(G)
@@ -88,9 +92,14 @@ function hierarchical_layout(G::Oscar.Graph)
     # Compute longest distance from any source (layer assignment)
     layers = Dict(v => 0 for v in Oscar.vertices(G))
 
+   
     for v in Oscar.vertices(G)
-        layers[v] = maximum(distance_to_sinks(G, v))
+        ds = maximum(distance_to_sinks(G, v))
+        dh = maximum(height(G,v))
+        layers[v] = ifelse(poset, dh, ds)
     end
+   
+    
 
     # Group vertices by layer
     layer_groups = Dict{Int, Vector{Int}}()
@@ -125,7 +134,8 @@ function hierarchical_layout(G::Oscar.Graph)
             if n == 1
                 x_pos = 0.0
             end
-            positions[v] = (x_pos, -l)
+            positions[v] = ifelse(poset, (x_pos, -l), (x_pos, -l))
+             
         end
     end
 
@@ -141,4 +151,35 @@ function hierarchical_layout(G::Oscar.Graph)
     return fixed_layout
 end
 
+
+#########################
+#
+#        POSETS
+#
+#########################
+
+
+function plot_poset(P::labeledPoset{T, K, V}, G::Oscar.Graph, type::Symbol, title::String) where {T, K, V<: Vector{Int}}
+    G_posets = cover_digraph(poset(P))
+    lbs = p_labels(P)
+
+    node_lbs = []
+    for i in 1:length(Graphs.vertices(G_posets))
+        w = width(G, lbs[i], type)
+        push!(node_lbs, string(lbs[i])*" w="*string(w))
+    end
+
+    lay = hierarchical_layout(convert_to_Oscar(G_posets), true)
+
+    p = gplot(G_posets, layout=lay, 
+    nodelabel=node_lbs, nodelabeldist=4, nodelabelsize=5,
+    EDGELINEWIDTH=0.3, nodelabelangleoffset = π/4.7,
+    nodelabelc = "white", NODESIZE = 0.05,
+    title=uppercasefirst(string(type))*" "*title*"\n", title_color="white", title_size=5,
+    pad=1.2cm, # Add 10% padding on all sides
+    plot_size=(15cm, 20cm)
+    )
+    return p
+
+end
 
